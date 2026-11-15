@@ -158,6 +158,7 @@
       }
     ]
   },
+  "attribution": { "commit": "", "pr": "" },
   "extraKnownMarketplaces": {
     "askharilabs": { "source": { "source": "github", "repo": "askhari/claude-plugins" } }
   },

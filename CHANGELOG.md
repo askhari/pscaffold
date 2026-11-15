@@ -21,6 +21,8 @@ Template contract **1** · works with the `pscaffold` plugin **0.2.x** from
 - Worktree-safe local development: shared Postgres cluster, per-worktree databases,
   `just db-prune` for databases of removed worktrees.
 - `CONTRACT.md` and `.claude/pscaffold.json`: what the plugin relies on, versioned.
+- `.claude/settings.json` turns off Claude's commit and PR attribution, so commits carry only
+  the developer's identity.
 - `template-update` workflow: each product opens a pull request when a new template release
   is out.
 

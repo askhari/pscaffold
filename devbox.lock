@@ -1,7 +1,7 @@
 {
   "lockfile_version": "1",
   "packages": {
-    "actionlint@latest": {
+    "actionlint@1.7.12": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#actionlint",
       "source": "devbox-search",
@@ -49,7 +49,7 @@
         }
       }
     },
-    "copier@latest": {
+    "copier@9.17.1": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#copier",
       "source": "devbox-search",
@@ -103,7 +103,7 @@
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4?lastModified=1794495034&narHash=sha256-E0hYoioqUtM2XmPPvYYpJgdADF5AW9oOoPSEiM9dTHQ%3D"
     },
-    "jq@latest": {
+    "jq@1.8.2": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#jq",
       "source": "devbox-search",
@@ -192,7 +192,7 @@
         }
       }
     },
-    "just@latest": {
+    "just@1.59.0": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#just",
       "source": "devbox-search",
@@ -257,7 +257,7 @@
         }
       }
     },
-    "shellcheck@latest": {
+    "shellcheck@0.11.0": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#shellcheck",
       "source": "devbox-search",
@@ -361,7 +361,7 @@
         }
       }
     },
-    "terraform@latest": {
+    "terraform@1.17.1": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#terraform",
       "source": "devbox-search",
@@ -399,7 +399,7 @@
         }
       }
     },
-    "tflint@latest": {
+    "tflint@0.66.0": {
       "last_modified": "2026-11-12T14:50:34Z",
       "resolved": "github:NixOS/nixpkgs/2074cc672349f14240fb7ea90d509e0b643e9dd4#tflint",
       "source": "devbox-search",

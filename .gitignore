@@ -2,3 +2,4 @@
 .devbox/
 node_modules/
 /.render/
+*.swp

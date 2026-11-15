@@ -28,13 +28,14 @@ jobs:
     environment: dev
     steps:
       - uses: actions/checkout@v7
+      # Only Node and pnpm are needed here, so skip Devbox (pnpm's version comes from the
+      # `packageManager` field in package.json).
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version
-      - uses: jetify-com/devbox-install-action@v0.16.0
-        with:
-          enable-cache: true
-      - run: devbox run -- pnpm install --frozen-lockfile
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
       - uses: expo/expo-github-action@9.0.2
         with:
           eas-version: latest

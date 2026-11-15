@@ -10,10 +10,7 @@ default:
 
 # Render the template into DEST using the given backend (go|rust).
 render backend dest *extra:
-    rm -rf {{dest}}
-    copier copy --trust --defaults --vcs-ref=HEAD \
-      -d project_name="Sample Product" -d backend={{backend}} {{extra}} \
-      {{justfile_directory()}} {{dest}}
+    scripts/render.sh {{backend}} {{dest}} {{extra}}
 
 # Render and run the generated project's full verification.
 test backend:
@@ -22,6 +19,6 @@ test backend:
 
 # Lint the repo's own shell scripts and the plugin manifest.
 lint:
-    shellcheck template/.claude/hooks/*.sh
+    shellcheck template/.claude/hooks/*.sh template/scripts/*.sh scripts/*.sh
     jq empty .claude-plugin/marketplace.json plugin/.claude-plugin/plugin.json
     actionlint .github/workflows/*.yml

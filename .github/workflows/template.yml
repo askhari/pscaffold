@@ -1,5 +1,9 @@
 # Renders the template with every backend and runs the generated project's `just verify`.
 # A template change is only good if a freshly generated product is green.
+#
+# Cache layout: GitHub cache entries are immutable, so when parallel jobs miss the same key
+# only the first one can save it. The `tools` job installs the generated product's Devbox
+# packages once and saves them; the render jobs wait for it and always restore a warm cache.
 name: template
 
 on:
@@ -7,8 +11,15 @@ on:
   push:
     branches: [main]
 
+concurrency:
+  group: template-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
+
+env:
+  COPIER: uvx copier@9.17.1
 
 jobs:
   lint:
@@ -20,7 +31,23 @@ jobs:
           enable-cache: true
       - run: devbox run -- just lint
 
+  # Warms the Nix store cache keyed on the template's devbox.lock (identical for both
+  # backends). On a cache hit this only restores it; on a miss it installs and saves it once.
+  tools:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@v10
+      - run: scripts/render.sh go .render/product -d run_setup=false
+      - uses: jetify-com/devbox-install-action@v0.16.0
+        with:
+          enable-cache: true
+          project-path: .render/product
+
   render:
+    needs: tools
     runs-on: ubuntu-latest
     timeout-minutes: 40
     strategy:
@@ -38,16 +65,32 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version: stable
+          cache-dependency-path: |
+            template/apps/*/go.sum
+            template/apps/*/tools.sum
       - if: matrix.backend == 'rust'
         uses: dtolnay/rust-toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
+      - uses: astral-sh/setup-uv@v10
+      - name: Render
+        run: |
+          scripts/render.sh ${{ matrix.backend }} .render/product -d run_setup=false
+          cp .render/product/devbox.lock "$RUNNER_TEMP/devbox.lock"
       - uses: jetify-com/devbox-install-action@v0.16.0
         with:
           enable-cache: true
-      - name: Render and verify
+          project-path: .render/product
+      - name: Setup and verify
+        working-directory: .render/product
         run: |
-          git config --global user.email ci@example.com
-          git config --global user.name ci
-          devbox run -- just test ${{ matrix.backend }}
+          devbox run -- just setup
+          devbox run -- just verify
+      - name: devbox.lock is stable
+        run: |
+          if ! cmp -s "$RUNNER_TEMP/devbox.lock" .render/product/devbox.lock; then
+            echo "::error::Devbox rewrote the template's devbox.lock. Regenerate template/devbox.lock.jinja from a rendered project."
+            diff "$RUNNER_TEMP/devbox.lock" .render/product/devbox.lock || true
+            exit 1
+          fi

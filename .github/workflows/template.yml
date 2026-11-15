@@ -39,7 +39,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
       - run: scripts/render.sh go .render/product -d run_setup=false
       - uses: jetify-com/devbox-install-action@v0.16.0
         with:
@@ -73,7 +73,7 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt, clippy
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.3.3
       - name: Render
         run: |
           scripts/render.sh ${{ matrix.backend }} .render/product -d run_setup=false

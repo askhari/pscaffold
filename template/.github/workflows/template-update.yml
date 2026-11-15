@@ -1,0 +1,75 @@
+# Pulls new pscaffold template releases into this product and opens a pull request.
+# The template knows nothing about the products generated from it: each product checks for
+# updates itself.
+name: template-update
+
+on:
+  schedule:
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: template-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Check the template source
+        id: source
+        run: |
+          src=$(sed -n 's/^_src_path: *//p' .copier-answers.yml)
+          case "$src" in
+            gh:*|https://*|git@*) echo "remote=true" >>"$GITHUB_OUTPUT" ;;
+            *) echo "::notice::Template source '$src' is not a remote repository; nothing to update."
+               echo "remote=false" >>"$GITHUB_OUTPUT" ;;
+          esac
+
+      - uses: astral-sh/setup-uv@v10.3.3
+        if: steps.source.outputs.remote == 'true'
+
+      - name: copier update
+        id: update
+        if: steps.source.outputs.remote == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          before=$(sed -n 's/^_commit: *//p' .copier-answers.yml)
+          uvx copier@9.17.1 update --trust --defaults --skip-tasks --conflict inline
+          after=$(sed -n 's/^_commit: *//p' .copier-answers.yml)
+          echo "before=$before" >>"$GITHUB_OUTPUT"
+          echo "after=$after" >>"$GITHUB_OUTPUT"
+          if grep -rIl --exclude-dir=.git --exclude-dir=node_modules -e '^<<<<<<< ' . >conflicts.txt; then
+            echo "conflicts=true" >>"$GITHUB_OUTPUT"
+          fi
+          rm -f conflicts.txt
+          # Conflicted files are left unmerged in the index; stage them, markers included,
+          # so the pull request carries them for a human to resolve.
+          git add -A
+
+      - uses: peter-evans/create-pull-request@v8.1.3
+        if: steps.source.outputs.remote == 'true' && steps.update.outputs.before != steps.update.outputs.after
+        with:
+          branch: chore/template-update
+          delete-branch: true
+          commit-message: 'chore: update from pscaffold ${{ steps.update.outputs.after }}'
+          title: 'chore: update from pscaffold ${{ steps.update.outputs.after }}'
+          labels: risk:normal
+          body: |
+            Template update ${{ steps.update.outputs.before }} → ${{ steps.update.outputs.after }}.
+
+            ${{ steps.update.outputs.conflicts == 'true' && '**This update has merge conflicts** (`<<<<<<<` markers). Resolve them on this branch before merging.' || 'No merge conflicts.' }}
+
+            Before merging, check out this branch and run `just setup` then `just verify`:
+            the update skipped copier's tasks, so lockfiles and generated code may need
+            refreshing. Pull requests opened by this workflow do not start CI on their own;
+            push a commit (or close and reopen the PR) to run it.

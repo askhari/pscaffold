@@ -17,8 +17,8 @@ test backend:
     just render {{backend}} {{render_dir}}/{{backend}}
     cd {{render_dir}}/{{backend}} && devbox run -q -- just verify
 
-# Lint the repo's own shell scripts and the plugin manifest.
+# Lint the repo's own shell scripts, the template's Claude config and the workflows.
 lint:
     shellcheck template/.claude/hooks/*.sh template/scripts/*.sh scripts/*.sh
-    jq empty .claude-plugin/marketplace.json plugin/.claude-plugin/plugin.json
-    actionlint .github/workflows/*.yml
+    jq empty template/.claude/settings.json template/.claude/pscaffold.json
+    actionlint .github/workflows/*.yml template/.github/workflows/template-update.yml

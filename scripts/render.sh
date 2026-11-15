@@ -8,5 +8,5 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 rm -rf "$dest"
 # shellcheck disable=SC2086 # COPIER may hold a command plus its arguments.
 ${COPIER:-copier} copy --trust --defaults --vcs-ref=HEAD \
-  -d project_name="Sample Product" -d backend="$backend" "$@" \
+  -d project_name="Sample Product" -d github_owner=example -d backend="$backend" "$@" \
   "$root" "$dest"

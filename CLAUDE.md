@@ -1,11 +1,14 @@
 # pscaffold
 
-This repo ships two things that evolve together:
+This repo is the copier template every pscaffold product is generated from (`template/` +
+`copier.yml`). `docs/adr/` explains why it looks the way it does.
 
-- `plugin/` — a Claude Code plugin (`pscaffold`) with the product pipeline skills.
-- `template/` + `copier.yml` — the copier template every new product is generated from.
-
-`plugin/PREFERENCES.md` holds the standing decisions the skills rely on; `docs/adr/` explains why.
+The `pscaffold` plugin that drives products (skills, `PREFERENCES.md`) lives in the public
+marketplace repo `askhari/claude-plugins`, under `plugins/pscaffold`. What the plugin relies on
+is written down in `CONTRACT.md`: any change to a clause there is compatible or breaking, and
+a breaking one bumps the contract version (`CONTRACT.md` and `template/.claude/pscaffold.json`)
+and needs a matching plugin release. Record every release in `CHANGELOG.md` with its contract
+version.
 
 Working here:
 - All files are written in English.
@@ -15,3 +18,4 @@ Working here:
   rendered project (`just render go /tmp/x`) and copy the results back.
 - `just test go` / `just test rust` renders the template into `.render/` and runs the generated
   project's `just verify`. Run it for both backends before declaring template work done.
+- Nothing personal in the template: no owner, account or host defaults. This repo is public.

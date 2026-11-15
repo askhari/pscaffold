@@ -159,10 +159,10 @@
     ]
   },
   "extraKnownMarketplaces": {
-    "pscaffold": { "source": { "source": "github", "repo": "askhari/pscaffold" } }
+    "askharilabs": { "source": { "source": "github", "repo": "askhari/claude-plugins" } }
   },
   "enabledPlugins": {
-    "pscaffold@pscaffold": true,
+    "pscaffold@askharilabs": true,
     "expo@claude-plugins-official": true
   }
 }

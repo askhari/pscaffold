@@ -45,7 +45,8 @@ description:
 github_owner:
   type: str
   help: GitHub user or organization that owns the repository
-  default: askhari
+  validator: >-
+    {% if not (github_owner | regex_search('^[A-Za-z0-9][A-Za-z0-9-]*$')) %}Required: a GitHub user or organization{% endif %}
 
 bundle_id:
   type: str

@@ -29,6 +29,17 @@ tasks depending on it.
   (taken from the spec's verification points) and must also leave `just verify` green.
 - **Risk** comes from the paths a task touches (brief's risk tiers); it decides how much
   human review the PR needs.
+- **Model** is the cheapest worker that can do the task well; `orchestrate` dispatches the
+  `implementer` agent with it. Pick by what the task demands, not by its size:
+  - `haiku` — mechanical change with an obvious shape: copy, docs, config, renames, adding a
+    field that follows an existing pattern. Only for `low` risk.
+  - `sonnet` — the default: a normal vertical slice that follows patterns already in the
+    codebase.
+  - `opus` — new patterns or subtle logic: the first slice of a new module, auth, sync and
+    conflict resolution, concurrency, data migrations, anything `high` risk.
+
+  When unsure between two, pick the cheaper one; `orchestrate` escalates a task that fails
+  judgment. HITL tasks have no model (`—`).
 - **Inherently HITL** (never AFK): creating accounts or apps in Apple / Google / Microsoft /
   Expo consoles, OAuth client registration, signing certificates, store listings, secrets,
   production data, DNS for real domains, visual sign-off of a new screen, any irreversible
@@ -39,10 +50,10 @@ tasks depending on it.
 ```markdown
 # NNNN — <Feature> · tasks
 
-| ID | Task | Type | Blocked by | Risk |
-|----|------|------|------------|------|
-| NNNN-01 | … | AFK | — | normal |
-| NNNN-02 | … | HITL | — | high |
+| ID | Task | Type | Blocked by | Risk | Model |
+|----|------|------|------------|------|-------|
+| NNNN-01 | … | AFK | — | normal | sonnet |
+| NNNN-02 | … | HITL | — | high | — |
 
 ## NNNN-01 — <title>
 Stories: 1, 2 · Modules: <names>
@@ -62,4 +73,5 @@ Task status is **not** stored here: a task is in progress when a PR whose title 
 that still exist, never reuse a number, and for a changed task whose PR already merged add a
 new task that amends it instead of rewriting history.
 
-Report the dependency graph and the HITL tasks. Next step: `orchestrate NNNN`.
+Report the dependency graph, the HITL tasks and how many tasks go to each model. Next step:
+`orchestrate NNNN`, run from a session on the strongest model you have.

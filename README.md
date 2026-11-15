@@ -25,8 +25,8 @@ kickoff ──► architect ──► new-project ──► ┌─ spec ──�
 | `architect` | Decisions the code cannot show: shape, cross-cutting concerns, infra, risk | `docs/adr/*`, brief updates, copier answers |
 | `new-project` | Generates the repo from the template and verifies it is green | A product repo whose `just verify` passes |
 | `spec` | One roadmap item → modules, user stories, verification points | `docs/specs/NNNN-slug/spec.md` |
-| `plan` | One spec → vertical-slice tasks, each with a pass/fail check | `docs/specs/NNNN-slug/tasks.md` |
-| `orchestrate` | Runs the tasks as Claude Code sessions; each ends in a PR | PRs, task status updates |
+| `plan` | One spec → vertical-slice tasks, each with a pass/fail check, risk tier and worker model | `docs/specs/NNNN-slug/tasks.md` |
+| `orchestrate` | Manager on the strongest model; dispatches each task to the `implementer` agent on its model, in its own worktree | One PR per task |
 
 The human is in the loop for the interviews, for HITL tasks, and for reviewing risky PRs.
 Everything else is verified mechanically (hooks + CI).

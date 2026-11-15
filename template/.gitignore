@@ -38,3 +38,6 @@ crash.log
 !.env.example
 .DS_Store
 *.tsbuildinfo
+
+# Claude Code task worktrees
+.claude/worktrees/

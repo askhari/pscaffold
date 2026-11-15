@@ -45,3 +45,10 @@ become the new default for future products.
 - Verification is mechanical: `just check-file`, `just test-affected`, `just verify`, wired to
   hooks that exit 2 on failure.
 - Every task ends in a pull request; orchestration happens through Claude Code sessions.
+- Model tiers: the manager (`orchestrate`) and the interview skills (`kickoff`, `architect`,
+  `spec`) run on the strongest model available. Implementation runs in the `implementer`
+  agent on the model `plan` assigns per task — `haiku` for mechanical low-risk changes,
+  `sonnet` by default, `opus` for new patterns, security, sync, migrations and high risk.
+  A task that fails judgment twice moves one model up.
+- Parallel tasks run in git worktrees. Each worktree gets its own databases on the main
+  checkout's local Postgres cluster; ports are picked free, never fixed.

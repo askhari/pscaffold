@@ -13,10 +13,17 @@ set export := true
 
 root := justfile_directory()
 backend := "{{ backend }}"
+
+# Git worktrees (one per agent task) share the main checkout's Postgres cluster but get their
+# own databases, so parallel tasks never step on each other's data.
+main_root := `d=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && dirname "$d" || pwd`
+db_suffix := if root == main_root { "" } else { "_" + trim_end_match(replace_regex(lowercase(file_name(root)), "[^a-z0-9]+", "_"), "_") }
 pg_port := env_var_or_default("DEV_DB_PORT", "{{ dev_db_port }}")
-pg_dir := root / ".data/postgres"
-db_url := "postgres://app@localhost:" + pg_port + "/app?sslmode=disable"
-test_db_url := "postgres://app@localhost:" + pg_port + "/app_test?sslmode=disable"
+pg_dir := main_root / ".data/postgres"
+db_name := "app" + db_suffix
+test_db_name := "app_test" + db_suffix
+db_url := "postgres://app@localhost:" + pg_port + "/" + db_name + "?sslmode=disable"
+test_db_url := "postgres://app@localhost:" + pg_port + "/" + test_db_name + "?sslmode=disable"
 
 # List recipes.
 default:
@@ -65,7 +72,7 @@ generate:
 
 # ─── Local database (Postgres from Devbox) ─────────────────────────────────
 
-# Start the local Postgres, creating the cluster and databases on first run.
+# Start the local Postgres, creating the cluster and this checkout's databases on first run.
 db-up:
     #!/usr/bin/env bash
     set -euo pipefail
@@ -77,19 +84,46 @@ db-up:
       pg_ctl -D "${pg_dir}" -l "${pg_dir}/server.log" -w \
         -o "-p ${pg_port} -k ${pg_dir} -c listen_addresses=localhost" start >/dev/null
     fi
-    for db in app app_test; do
+    for db in "${db_name}" "${test_db_name}"; do
       psql -h localhost -p ${pg_port} -U app -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1 \
         || createdb -h localhost -p ${pg_port} -U app "$db"
     done
+    # The main checkout also clears databases left behind by deleted worktrees.
+    if [[ "${root}" == "${main_root}" ]]; then just db-prune; fi
 
 # Stop the local Postgres.
 db-down:
     pg_ctl -D "${pg_dir}" stop -m fast || true
 
-# Drop and recreate the local databases.
-db-reset: db-down
-    rm -rf "${pg_dir}"
+# Drop and recreate this checkout's databases (the shared cluster keeps running).
+db-reset: db-up
+    #!/usr/bin/env bash
+    set -euo pipefail
+    for db in "${db_name}" "${test_db_name}"; do
+      psql -h localhost -p ${pg_port} -U app -d postgres -qc "DROP DATABASE IF EXISTS \"$db\" WITH (FORCE)"
+    done
     just db-up
+
+# Drop the databases of git worktrees that no longer exist (also run by `db-up` in the main checkout).
+db-prune:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    pg_ctl -D "${pg_dir}" status >/dev/null 2>&1 || exit 0
+    keep=$(git worktree list --porcelain | sed -n 's/^worktree //p' | while read -r wt; do
+      name=$(basename "$wt" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9]+/_/g; s/_+$//')
+      printf 'app_%s\napp_test_%s\n' "$name" "$name"
+    done)
+    psql -h localhost -p ${pg_port} -U app -d postgres -tAc \
+      "SELECT datname FROM pg_database WHERE datname LIKE 'app\_%' AND datname NOT IN ('app', 'app_test')" \
+      | while read -r db; do
+          grep -qxF "$db" <<<"$keep" && continue
+          psql -h localhost -p ${pg_port} -U app -d postgres -qc "DROP DATABASE \"$db\" WITH (FORCE)" </dev/null
+          echo "db-prune: dropped $db"
+        done
+
+# Delete the whole local cluster, including every worktree's databases.
+db-destroy: db-down
+    rm -rf "${pg_dir}"
 
 # ─── Development ────────────────────────────────────────────────────────────
 
@@ -221,7 +255,7 @@ test-api: db-up
 test-contract: db-up
     #!/usr/bin/env bash
     set -euo pipefail
-    port=18080
+    port=$(node -e 'const s=require("net").createServer().listen(0,()=>{console.log(s.address().port);s.close()})')
     log=$(mktemp)
 {%- if backend == 'go' %}
     (cd apps/api && go build -o "${root}/.data/api" ./cmd/api)

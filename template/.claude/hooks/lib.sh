@@ -4,10 +4,8 @@
 
 set -uo pipefail
 
-cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}" || exit 0
-
-# Read a field from the hook's JSON input (stdin) using Node, which every developer has.
-# Usage: hook_input=$(cat); field "$hook_input" tool_input.file_path
+# Read a field from a JSON document using Node, which every developer has.
+# Usage: field "$HOOK_INPUT" tool_input.file_path
 field() {
   node -e '
     let v = JSON.parse(process.argv[1] || "{}");
@@ -15,6 +13,21 @@ field() {
     if (v !== undefined && v !== null) process.stdout.write(String(v));
   ' "$1" "$2" 2>/dev/null
 }
+
+# The hook's JSON input (stdin), read once.
+HOOK_INPUT=$(cat)
+
+# Work in the checkout the session is using. Agent tasks run in git worktrees, so this is not
+# always $CLAUDE_PROJECT_DIR.
+enter_checkout() {
+  local dir=$1 top
+  [[ -n "$dir" ]] || return 1
+  top=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || return 1
+  cd "$top" || return 1
+}
+enter_checkout "$(field "$HOOK_INPUT" cwd)" \
+  || enter_checkout "${CLAUDE_PROJECT_DIR:-$PWD}" \
+  || exit 0
 
 # Run a just recipe inside the Devbox environment.
 run_just() {

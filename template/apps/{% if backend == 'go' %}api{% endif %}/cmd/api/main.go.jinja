@@ -1,0 +1,96 @@
+// Command api serves the {{ project_name }} HTTP API.
+//
+//	api serve    run migrations, then serve HTTP (default)
+//	api migrate  run migrations and exit
+package main
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
+
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"{{ go_module }}/internal/config"
+	"{{ go_module }}/internal/db"
+	"{{ go_module }}/internal/httpapi"
+)
+
+// version is set at build time with -ldflags "-X main.version=...".
+var version = "dev"
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	if err := run(context.Background(), os.Args[1:]); err != nil {
+		logger.Error("fatal", "err", err)
+		os.Exit(1)
+	}
+}
+
+func run(ctx context.Context, args []string) error {
+	ctx, stop := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+
+	cmd := "serve"
+	if len(args) > 0 {
+		cmd = args[0]
+	}
+
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return fmt.Errorf("connect database: %w", err)
+	}
+	defer pool.Close()
+
+	if err := db.Migrate(ctx, pool); err != nil {
+		return err
+	}
+
+	switch cmd {
+	case "migrate":
+		return nil
+	case "serve":
+		return serve(ctx, cfg, pool)
+	default:
+		return fmt.Errorf("unknown command %q (want serve or migrate)", cmd)
+	}
+}
+
+func serve(ctx context.Context, cfg config.Config, pool *pgxpool.Pool) error {
+	srv := &http.Server{
+		Addr:              fmt.Sprintf(":%d", cfg.Port),
+		Handler:           httpapi.NewRouter(httpapi.Deps{Pool: pool, Version: version}),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+
+	errCh := make(chan error, 1)
+	go func() {
+		slog.Info("listening", "addr", srv.Addr, "version", version)
+		errCh <- srv.ListenAndServe()
+	}()
+
+	select {
+	case err := <-errCh:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
+	case <-ctx.Done():
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		return srv.Shutdown(shutdownCtx)
+	}
+}

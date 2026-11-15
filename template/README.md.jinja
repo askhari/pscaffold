@@ -1,0 +1,38 @@
+# {{ project_name }}
+
+{{ description }}
+
+| Path | Contents |
+|---|---|
+| `apps/app` | Expo app (iOS, iPadOS, Android, web) |
+| `apps/api` | HTTP API ({{ 'Go' if backend == 'go' else 'Rust' }}) |
+| `contract` | OpenAPI contract — source of truth for the API |
+| `packages/api-client` | Generated TypeScript client + contract tests |
+| `infra` | {{ 'Terraform (DigitalOcean) and' if infra_target == 'digitalocean' else '' }} Docker Compose deployment |
+| `docs` | Brief, ADRs, specs and tasks |
+
+## Requirements
+
+- [Devbox](https://www.jetify.com/devbox) for support tools (just, pnpm, Postgres, Terraform…).
+- Node (version in `.node-version`, e.g. via `fnm`).
+{%- if backend == 'go' %}
+- Go (version in `apps/api/go.mod`).
+{%- else %}
+- Rust via `rustup` (version in `apps/api/rust-toolchain.toml`).
+{%- endif %}
+- Xcode / Android Studio for native development builds.
+
+## Getting started
+
+```bash
+devbox shell
+just setup        # install, generate, start local Postgres
+just dev-api      # API on http://localhost:8080
+just dev-app      # Expo dev server
+just verify       # everything CI runs
+```
+
+Run `just` to list every recipe.
+
+Generated from [pscaffold](https://github.com/askhari/pscaffold); pull template updates with
+`devbox run -- copier update --trust`.

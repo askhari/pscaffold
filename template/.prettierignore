@@ -1,0 +1,7 @@
+pnpm-lock.yaml
+**/generated/**
+contract/dist/
+apps/api/
+infra/
+# Rendered from the template with variable-width tables
+/README.md

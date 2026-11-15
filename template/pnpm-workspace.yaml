@@ -1,0 +1,6 @@
+packages:
+  - apps/app
+  - packages/*
+  - contract
+allowBuilds:
+  '@parcel/watcher': false

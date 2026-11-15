@@ -1,0 +1,15 @@
+{
+  "$schema": "https://raw.githubusercontent.com/jetify-com/devbox/0.18.4/.schema/devbox.schema.json",
+  "packages": [
+    "just@latest",
+    "copier@latest",
+    "terraform@latest",
+    "tflint@latest",
+    "shellcheck@latest",
+    "jq@latest",
+    "actionlint@latest"
+  ],
+  "shell": {
+    "init_hook": []
+  }
+}

@@ -1,0 +1,39 @@
+# Infrastructure
+
+Only a `dev` environment exists. Add `prod` by copying `terraform/envs/dev` to
+`terraform/envs/prod` (own state key, own GitHub environment and secrets) once real users or a
+TestFlight build depend on it.
+
+## Runtime (`deploy/`)
+
+Docker Compose on a single host: API, PostgreSQL 18 and Caddy. The `deploy-dev` workflow builds
+the API image, pushes it to GHCR and runs `docker compose up -d` over SSH as the `deploy` user in
+`/opt/{{ project_slug }}`. First-time host setup (once):
+
+1. Copy `deploy/compose.yaml`, `deploy/Caddyfile` and `deploy/env.example` (as `.env`, with real
+   values) to `/opt/{{ project_slug }}/`.
+2. `docker login ghcr.io` on the host with a token that can read packages.
+3. Add `DEPLOY_HOST` and `DEPLOY_SSH_KEY` to the `dev` environment secrets in GitHub.
+{% if infra_target == 'digitalocean' %}
+## Terraform (`terraform/`)
+
+`modules/host` creates the droplet (Docker preinstalled via cloud-init), a reserved IP, an SSH
+key and a firewall. `envs/dev` instantiates it. State lives in a DigitalOcean Spaces bucket
+(S3-compatible backend, see `envs/dev/backend.hcl`); create that bucket once by hand.
+
+```bash
+export DIGITALOCEAN_TOKEN=...            # or `doctl auth init`
+export AWS_ACCESS_KEY_ID=...             # Spaces key, used by the S3 backend
+export AWS_SECRET_ACCESS_KEY=...
+terraform -chdir=infra/terraform/envs/dev init -backend-config=backend.hcl
+terraform -chdir=infra/terraform/envs/dev plan
+```
+
+`terraform apply` runs only from CI (`.github/workflows/terraform.yml`) after merge; agents are
+denied `apply`/`destroy` locally.
+{% else %}
+## Host
+
+The VPS is provisioned outside this repo. It needs Docker with the compose plugin and a `deploy`
+user allowed to run Docker.
+{% endif %}

@@ -1,0 +1,245 @@
+# {{ project_name }} — single entry point for humans, agents, hooks and CI.
+#
+# The verification contract (called by .claude/hooks and by CI):
+#   just check-file <path>   format + lint one file           (after every edit)
+#   just test-affected       tests for what changed vs main   (when a task is completed)
+#   just verify              everything                       (before a session ends, in CI)
+#
+# Customize what runs inside these recipes per product; keep the recipe names stable.
+
+set shell := ["bash", "-euo", "pipefail", "-c"]
+set dotenv-load := true
+set export := true
+
+root := justfile_directory()
+backend := "{{ backend }}"
+pg_port := env_var_or_default("DEV_DB_PORT", "{{ dev_db_port }}")
+pg_dir := root / ".data/postgres"
+db_url := "postgres://app@localhost:" + pg_port + "/app?sslmode=disable"
+test_db_url := "postgres://app@localhost:" + pg_port + "/app_test?sslmode=disable"
+
+# List recipes.
+default:
+    @just --list --unsorted
+
+# ─── Setup ──────────────────────────────────────────────────────────────────
+
+# Check that installed language versions match the versions pinned in the repo.
+doctor *flags:
+    #!/usr/bin/env bash
+    set -uo pipefail
+    quiet=false; [[ "${flags}" == *--quiet* ]] && quiet=true
+    fail=0
+    warn() { echo "doctor: $*" >&2; fail=1; }
+    want_node=$(cat .node-version)
+    have_node=$(node --version 2>/dev/null | sed 's/^v//; s/\..*//') || true
+    [[ "$have_node" == "$want_node" ]] || warn "Node $want_node expected (found ${have_node:-none}); run: fnm use"
+{%- if backend == 'go' %}
+    want_go=$(awk '/^go /{print $2}' apps/api/go.mod)
+    have_go=$(go env GOVERSION 2>/dev/null | sed 's/^go//') || true
+    [[ -n "$have_go" ]] || warn "Go $want_go+ not installed"
+{%- else %}
+    want_rust=$(awk -F'"' '/^channel/{print $2}' apps/api/rust-toolchain.toml)
+    have_rust=$(cd apps/api && rustc --version 2>/dev/null | awk '{print $2}') || true
+    [[ "$have_rust" == "$want_rust"* ]] || warn "Rust $want_rust expected (found ${have_rust:-none}); install rustup so rust-toolchain.toml is honoured"
+{%- endif %}
+    command -v pnpm >/dev/null || warn "pnpm missing; run inside 'devbox shell' or prefix with 'devbox run --'"
+    if [[ $fail == 0 && $quiet == false ]]; then echo "doctor: ok"; fi
+    exit $fail
+
+# Install dependencies, generate code and initialize the local database.
+setup: doctor
+    pnpm install
+    just generate
+    just db-up
+
+# ─── Code generation ────────────────────────────────────────────────────────
+
+# Regenerate everything derived from the contract and the SQL.
+generate:
+    pnpm turbo run generate
+{%- if backend == 'go' %}
+    cd apps/api && go generate ./...
+    cd apps/api && go tool -modfile=tools.mod sqlc generate
+{%- endif %}
+
+# ─── Local database (Postgres from Devbox) ─────────────────────────────────
+
+# Start the local Postgres, creating the cluster and databases on first run.
+db-up:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f "${pg_dir}/PG_VERSION" ]]; then
+      mkdir -p "${pg_dir}"
+      initdb -D "${pg_dir}" -U app --auth=trust --encoding=UTF8 >/dev/null
+    fi
+    if ! pg_ctl -D "${pg_dir}" status >/dev/null 2>&1; then
+      pg_ctl -D "${pg_dir}" -l "${pg_dir}/server.log" -w \
+        -o "-p ${pg_port} -k ${pg_dir} -c listen_addresses=localhost" start >/dev/null
+    fi
+    for db in app app_test; do
+      psql -h localhost -p ${pg_port} -U app -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname='$db'" | grep -q 1 \
+        || createdb -h localhost -p ${pg_port} -U app "$db"
+    done
+
+# Stop the local Postgres.
+db-down:
+    pg_ctl -D "${pg_dir}" stop -m fast || true
+
+# Drop and recreate the local databases.
+db-reset: db-down
+    rm -rf "${pg_dir}"
+    just db-up
+
+# ─── Development ────────────────────────────────────────────────────────────
+
+# Run the API against the local database.
+dev-api: db-up
+{%- if backend == 'go' %}
+    cd apps/api && DATABASE_URL="${db_url}" go run ./cmd/api
+{%- else %}
+    cd apps/api && DATABASE_URL="${db_url}" cargo run
+{%- endif %}
+
+# Run the Expo dev server (press i / a / w for iOS, Android, web).
+dev-app:
+    cd apps/app && pnpm expo start
+
+# Create a timestamped migration: just new-migration add_users
+new-migration name:
+{%- if backend == 'go' %}
+    cd apps/api && go tool -modfile=tools.mod goose -dir migrations create ${name} sql
+{%- else %}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    ts=$(date -u +%Y%m%d%H%M%S)
+    for dir in up down; do
+      f="apps/api/migrations/${ts}_${name}.$dir.sql"
+      echo "-- ${name} ($dir)" > "$f"
+      echo "created $f"
+    done
+{%- endif %}
+
+# ─── Verification contract ──────────────────────────────────────────────────
+
+# Format and lint a single file (called by the PostToolUse hook after every edit).
+check-file path:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    f="${path}"
+    f="${f#${root}/}"
+    [[ -f "$f" ]] || exit 0
+    case "$f" in
+      */generated/*|*.gen.go|apps/api/internal/db/sqlc/*|*/dist/*|pnpm-lock.yaml) exit 0 ;;
+    esac
+    case "$f" in
+      apps/app/*.ts|apps/app/*.tsx|apps/app/*.js)
+        pnpm exec prettier --write --log-level warn "$f"
+        (cd apps/app && pnpm exec eslint --max-warnings 0 "${f#apps/app/}") ;;
+      *.ts|*.tsx|*.js|*.mjs|*.json|*.md)
+        pnpm exec prettier --write --log-level warn "$f" ;;
+      contract/*.yaml)
+        (cd contract && pnpm exec redocly lint --format stylish openapi.yaml) ;;
+{%- if backend == 'go' %}
+      apps/api/*.go)
+        gofmt -w "$f"
+        pkg="./$(dirname "${f#apps/api/}")/..."
+        (cd apps/api && go vet "$pkg") ;;
+{%- else %}
+      apps/api/*.rs)
+        (cd apps/api && rustfmt --edition 2024 "${f#apps/api/}") ;;
+{%- endif %}
+      *.tf|*.tfvars)
+        terraform fmt "$f" ;;
+      .github/workflows/*.yml|.github/workflows/*.yaml)
+        actionlint "$f" ;;
+      *.sh)
+        shellcheck "$f" ;;
+      */Dockerfile|Dockerfile)
+        hadolint "$f" ;;
+    esac
+
+# Run the tests affected by changes since the merge base with main (called when a task is completed).
+test-affected:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    base=$(git merge-base HEAD origin/main 2>/dev/null || git merge-base HEAD main 2>/dev/null || git rev-parse HEAD)
+    changed=$( { git diff --name-only "$base"; git ls-files --others --exclude-standard; } | sort -u)
+    [[ -n "$changed" ]] || { echo "test-affected: nothing changed"; exit 0; }
+    has() { grep -qE "$1" <<<"$changed"; }
+
+    if has '^contract/'; then just generate; fi
+    if has '^(apps/app|packages|contract)/'; then
+      pnpm turbo run typecheck test --filter="...[$base]"
+    fi
+    if has '^(apps/api|contract)/'; then just test-api; fi
+    if has '^contract/'; then just test-contract; fi
+{%- if infra_target == 'digitalocean' %}
+    if has '^infra/terraform/'; then just check-infra; fi
+{%- endif %}
+
+    # ── Critical suites: always run when their paths change (added by `architect` / `spec`).
+    # Example:
+    # if has '^apps/api/internal/auth/'; then (cd apps/api && TEST_DATABASE_URL="${test_db_url}" go test ./internal/auth/...); fi
+
+# Run every check: lint, typecheck, tests, contract and infrastructure (called before a session ends, and by CI).
+verify: lint test test-contract
+{%- if infra_target == 'digitalocean' %}
+    just check-infra
+{%- endif %}
+    @echo "verify: ok"
+
+# Static checks for every part of the repo.
+lint:
+    pnpm turbo run lint typecheck
+    pnpm exec prettier --check --log-level warn .
+{%- if backend == 'go' %}
+    cd apps/api && test -z "$(gofmt -l . | grep -v '\.gen\.go$' || true)" || (gofmt -l . && false)
+    cd apps/api && go vet ./...
+    cd apps/api && go tool -modfile=tools.mod golangci-lint run ./...
+{%- else %}
+    cd apps/api && cargo fmt --check
+    cd apps/api && cargo clippy --all-targets --locked -- -D warnings
+{%- endif %}
+    actionlint
+    shellcheck .claude/hooks/*.sh scripts/*.sh
+
+# Unit and integration tests (TypeScript + API).
+test:
+    pnpm turbo run test
+    just test-api
+
+# API tests against the local test database.
+test-api: db-up
+{%- if backend == 'go' %}
+    cd apps/api && TEST_DATABASE_URL="${test_db_url}" go test -race -count=1 ./...
+{%- else %}
+    cd apps/api && TEST_DATABASE_URL="${test_db_url}" cargo test --locked
+{%- endif %}
+
+# Contract tests: start the API on a free port and run the shared suite against it.
+test-contract: db-up
+    #!/usr/bin/env bash
+    set -euo pipefail
+    port=18080
+    log=$(mktemp)
+{%- if backend == 'go' %}
+    (cd apps/api && go build -o "${root}/.data/api" ./cmd/api)
+{%- else %}
+    (cd apps/api && cargo build --locked --quiet && cp target/debug/api "${root}/.data/api")
+{%- endif %}
+    DATABASE_URL="${test_db_url}" API_PORT=$port "${root}/.data/api" serve >"$log" 2>&1 &
+    pid=$!
+    trap 'kill $pid 2>/dev/null || true' EXIT
+    for _ in $(seq 1 50); do curl -fs "http://localhost:$port/healthz" >/dev/null && break; sleep 0.2; done
+    API_BASE_URL="http://localhost:$port" pnpm --filter "./packages/api-client" run test:contract \
+      || { echo "--- API log ---"; cat "$log"; exit 1; }
+{%- if infra_target == 'digitalocean' %}
+
+# Terraform formatting, validation and lint (no cloud credentials needed).
+check-infra:
+    terraform -chdir=infra/terraform fmt -check -recursive
+    terraform -chdir=infra/terraform/envs/dev init -backend=false -input=false >/dev/null
+    terraform -chdir=infra/terraform/envs/dev validate
+    cd infra/terraform && tflint --recursive --config "$PWD/.tflint.hcl"
+{%- endif %}

@@ -1,0 +1,23 @@
+# Every pull request carries exactly one risk label; the label decides how much review it needs.
+name: pr-policy
+
+on:
+  pull_request:
+    types: [opened, edited, labeled, unlabeled, synchronize, reopened]
+
+permissions:
+  pull-requests: read
+
+jobs:
+  risk-label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require one risk label
+        env:
+          LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        run: |
+          count=$(jq '[.[] | select(startswith("risk:"))] | length' <<<"$LABELS")
+          if [[ "$count" != "1" ]]; then
+            echo "::error::Add exactly one label: risk:low, risk:normal or risk:high (found $count)."
+            exit 1
+          fi

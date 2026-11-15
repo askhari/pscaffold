@@ -1,0 +1,53 @@
+# Renders the template with every backend and runs the generated project's `just verify`.
+# A template change is only good if a freshly generated product is green.
+name: template
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jetify-com/devbox-install-action@v0.16.0
+        with:
+          enable-cache: true
+      - run: devbox run -- just lint
+
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    strategy:
+      fail-fast: false
+      matrix:
+        backend: [go, rust]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: template/.node-version
+      - if: matrix.backend == 'go'
+        uses: actions/setup-go@v7
+        with:
+          go-version: stable
+      - if: matrix.backend == 'rust'
+        uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+      - uses: jetify-com/devbox-install-action@v0.16.0
+        with:
+          enable-cache: true
+      - name: Render and verify
+        run: |
+          git config --global user.email ci@example.com
+          git config --global user.name ci
+          devbox run -- just test ${{ matrix.backend }}

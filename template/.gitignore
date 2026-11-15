@@ -1,0 +1,40 @@
+# Dependencies and caches
+node_modules/
+.turbo/
+.pnpm-store/
+.devbox/
+.corepack/
+
+# Build output
+dist/
+target/
+bin/
+coverage/
+.data/
+
+# Expo
+.expo/
+web-build/
+expo-env.d.ts
+apps/app/ios/
+apps/app/android/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+*.pem
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
+
+# Local environment
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo

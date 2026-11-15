@@ -1,0 +1,29 @@
+{
+  "$schema": "https://turborepo.com/schema.json",
+  "tasks": {
+    "generate": {
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "../../contract/openapi.yaml",
+        "../../contract/paths/**",
+        "../../contract/schemas/**"
+      ],
+      "outputs": ["src/generated/**", "dist/**"],
+      "dependsOn": ["^generate"]
+    },
+    "lint": {
+      "dependsOn": ["^generate"]
+    },
+    "typecheck": {
+      "dependsOn": ["^generate", "generate"]
+    },
+    "test": {
+      "dependsOn": ["^generate", "generate"],
+      "outputs": []
+    },
+    "test:contract": {
+      "cache": false,
+      "env": ["API_BASE_URL"]
+    }
+  }
+}

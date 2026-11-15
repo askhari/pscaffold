@@ -1,0 +1,6 @@
+import { createApiClient, createQueryApi } from '@{{ project_slug }}/api-client';
+
+import { config } from './config';
+
+export const apiClient = createApiClient({ baseUrl: config.apiUrl });
+export const $api = createQueryApi(apiClient);

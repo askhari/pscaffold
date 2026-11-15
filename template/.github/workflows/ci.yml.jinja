@@ -1,0 +1,70 @@
+# Runs the same verification contract as local development: `just setup` + `just verify`.
+# Branch protection on `main` should require the `ci` job.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-{% raw %}${{ github.ref }}{% endraw %}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+{%- if backend == 'go' %}
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: apps/api/go.mod
+          cache-dependency-path: |
+            apps/api/go.sum
+            apps/api/tools.sum
+{%- else %}
+
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/api
+{%- endif %}
+
+      - uses: jetify-com/devbox-install-action@v0.16.0
+        with:
+          enable-cache: true
+
+      - name: Cache pnpm store
+        uses: actions/cache@v6
+        with:
+          path: ~/.local/share/pnpm/store
+          key: pnpm-{% raw %}${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}{% endraw %}
+
+      - name: Setup
+        run: devbox run -- just setup
+
+      - name: Verify
+        run: devbox run -- just verify
+
+      - name: Generated code is committed
+        run: |
+          if [[ -n "$(git status --porcelain)" ]]; then
+            echo "::error::Generated files are out of date. Run 'just generate' and commit the result."
+            git status --porcelain
+            git diff
+            exit 1
+          fi

@@ -1,0 +1,18 @@
+get:
+  operationId: getHealth
+  summary: Liveness and database readiness
+  tags: [system]
+  security: []
+  responses:
+    '200':
+      description: The API is up and the database answers
+      content:
+        application/json:
+          schema:
+            $ref: ../schemas/health.yaml#/Health
+    '503':
+      description: The database is unreachable
+      content:
+        application/problem+json:
+          schema:
+            $ref: ../schemas/problem.yaml#/Problem

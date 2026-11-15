@@ -1,0 +1,29 @@
+# Independent review of every pull request by a fresh Claude session (not the one that wrote it).
+# Setup: run /install-github-app in Claude Code; it may replace this file with its own version.
+name: claude-review
+
+on:
+  pull_request:
+    types: [opened, synchronize, ready_for_review]
+
+jobs:
+  review:
+    if: github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            Review pull request #${{ github.event.pull_request.number }} in ${{ github.repository }}.
+            Read CLAUDE.md, the spec and task linked in the description, and the diff.
+            Report only real problems: bugs, contract or migration mistakes, security issues,
+            offline-sync rule violations, and changes outside the task's scope. Leave inline
+            comments on the lines involved and one short summary comment.

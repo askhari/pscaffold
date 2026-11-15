@@ -1,0 +1,91 @@
+# copier configuration for pscaffold product repositories.
+_min_copier_version: "9.4"
+_subdirectory: template
+_answers_file: .copier-answers.yml
+_templates_suffix: .jinja
+_envops:
+  keep_trailing_newline: true
+
+# Files owned by the product once generated: copier never overwrites them on update.
+_skip_if_exists:
+  - docs/brief.md
+  - docs/adr/README.md
+  - .github/CODEOWNERS
+
+_message_after_copy: |
+  Generated {{ project_name }}.
+
+  Next steps:
+    cd {{ _copier_conf.dst_path }}
+    devbox run -- just setup
+    devbox run -- just verify
+
+_tasks:
+  - command: "[ -d .git ] || git init -q -b main"
+  - command: devbox run -- just setup
+    when: "{{ run_setup }}"
+
+project_name:
+  type: str
+  help: Human-readable product name
+  validator: "{% if not project_name %}Required{% endif %}"
+
+project_slug:
+  type: str
+  help: Kebab-case identifier (repo name, Docker image, Terraform resources)
+  default: "{{ project_name | lower | replace(' ', '-') }}"
+  validator: >-
+    {% if not (project_slug | regex_search('^[a-z][a-z0-9-]*[a-z0-9]$')) %}Use lowercase letters, digits and dashes{% endif %}
+
+description:
+  type: str
+  help: One-line description
+  default: "{{ project_name }}"
+
+github_owner:
+  type: str
+  help: GitHub user or organization that owns the repository
+  default: askhari
+
+bundle_id:
+  type: str
+  help: iOS bundle identifier / Android package name
+  default: "com.{{ github_owner | lower | replace('-', '') }}.{{ project_slug | replace('-', '') }}"
+
+backend:
+  type: str
+  help: API implementation language
+  choices:
+    Go (default): go
+    Rust: rust
+  default: go
+
+go_module:
+  type: str
+  help: Go module path of the API
+  default: "github.com/{{ github_owner }}/{{ project_slug }}/apps/api"
+  when: "{{ backend == 'go' }}"
+
+infra_target:
+  type: str
+  help: Where the dev environment runs
+  choices:
+    DigitalOcean (Terraform-managed droplet): digitalocean
+    Own VPS (Docker Compose over SSH): vps
+  default: digitalocean
+
+do_region:
+  type: str
+  help: DigitalOcean region
+  default: fra1
+  when: "{{ infra_target == 'digitalocean' }}"
+
+dev_db_port:
+  type: int
+  help: Local Postgres port for this project (use a different one per product on the same machine)
+  default: 54320
+
+run_setup:
+  type: bool
+  help: Install dependencies and generate code after copying (needs Devbox, Node, and the backend's language)
+  default: true

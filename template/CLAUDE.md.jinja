@@ -1,0 +1,14 @@
+# {{ project_name }}
+
+Product brief, roadmap and glossary: `docs/brief.md`. Decisions: `docs/adr/`. Feature specs and
+tasks: `docs/specs/`.
+
+- The HTTP contract in `contract/` is the source of truth. Change it first, run `just generate`,
+  then implement. Never edit generated code (`packages/api-client/src/generated`,
+  `apps/api` generated files).
+- Mobile is offline-first: synced entities use client-generated UUIDv7 ids, a server `version`
+  and soft deletes (see the sync ADR).
+- Done means `just verify` passes. Hooks run `just check-file` after edits, `just test-affected`
+  when a task is completed and `just verify` before the session ends.
+- Every task ends in a pull request titled `[NNNN-MM] <title>` with a `risk:*` label; never push
+  to `main`.

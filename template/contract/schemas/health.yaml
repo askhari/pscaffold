@@ -1,0 +1,14 @@
+Health:
+  type: object
+  additionalProperties: false
+  required: [status, database, version]
+  properties:
+    status:
+      type: string
+      enum: [ok]
+    database:
+      type: string
+      enum: [ok]
+    version:
+      type: string
+      description: Build version of the running API

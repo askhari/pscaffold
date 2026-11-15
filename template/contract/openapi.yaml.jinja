@@ -1,0 +1,23 @@
+openapi: 3.1.0
+info:
+  title: {{ project_name }} API
+  version: 0.1.0
+  description: |
+    Source of truth for the {{ project_name }} HTTP API. Clients and the server interface
+    are generated from this file (see the root `justfile`, recipe `generate`).
+    One file per resource under `paths/` and `schemas/` keeps parallel changes conflict-free.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+tags:
+  - name: system
+    description: Operational endpoints
+paths:
+  /healthz:
+    $ref: ./paths/health.yaml
+components:
+  schemas:
+    Health:
+      $ref: ./schemas/health.yaml#/Health
+    Problem:
+      $ref: ./schemas/problem.yaml#/Problem

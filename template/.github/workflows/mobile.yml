@@ -1,0 +1,51 @@
+# Mobile delivery with EAS. Pushes to main publish an over-the-air update to the `preview`
+# channel (internal testers only while there is no prod environment). Store builds run on demand.
+name: mobile
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - apps/app/**
+      - packages/**
+  workflow_dispatch:
+    inputs:
+      build:
+        description: Run an EAS build (preview profile) instead of an OTA update
+        type: boolean
+        default: false
+
+concurrency:
+  group: mobile
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  eas:
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+      - uses: jetify-com/devbox-install-action@v0.16.0
+        with:
+          enable-cache: true
+      - run: devbox run -- pnpm install --frozen-lockfile
+      - uses: expo/expo-github-action@9.0.2
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+      - name: OTA update (preview channel)
+        if: ${{ !inputs.build }}
+        working-directory: apps/app
+        env:
+          MESSAGE: ${{ github.event.head_commit.message || 'manual' }}
+        run: eas update --channel preview --message "$MESSAGE" --non-interactive
+      - name: Build (preview profile)
+        if: ${{ inputs.build }}
+        working-directory: apps/app
+        run: eas build --profile preview --platform all --non-interactive --no-wait

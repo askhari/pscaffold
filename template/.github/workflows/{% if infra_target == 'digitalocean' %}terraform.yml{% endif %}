@@ -1,0 +1,65 @@
+# Terraform for infra/terraform/envs/dev: plan on pull requests (posted as a comment),
+# apply after merge to main, gated by the `dev` GitHub environment.
+name: terraform
+
+on:
+  pull_request:
+    paths: [infra/terraform/**]
+  push:
+    branches: [main]
+    paths: [infra/terraform/**]
+  workflow_dispatch:
+
+concurrency:
+  group: terraform-dev
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  TF_IN_AUTOMATION: 'true'
+  TF_INPUT: 'false'
+  DIGITALOCEAN_TOKEN: ${{ secrets.DIGITALOCEAN_TOKEN }}
+  AWS_ACCESS_KEY_ID: ${{ secrets.SPACES_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.SPACES_SECRET_ACCESS_KEY }}
+  TF_VAR_ssh_public_key: ${{ vars.DEPLOY_SSH_PUBLIC_KEY }}
+
+defaults:
+  run:
+    working-directory: infra/terraform/envs/dev
+
+jobs:
+  plan:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - run: terraform init -backend-config=backend.hcl
+      - id: plan
+        run: terraform plan -no-color -out=tfplan | tee plan.txt
+      - name: Comment plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+        run: |
+          {
+            echo '### terraform plan · dev'
+            echo '```'
+            tail -c 60000 plan.txt
+            echo '```'
+          } > comment.md
+          gh pr comment "$PR" --body-file comment.md --edit-last --create-if-none
+
+  apply:
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - uses: actions/checkout@v7
+      - uses: hashicorp/setup-terraform@v4
+      - run: terraform init -backend-config=backend.hcl
+      - run: terraform apply -auto-approve

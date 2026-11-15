@@ -1,0 +1,55 @@
+// Package httpapi implements the HTTP API defined in contract/openapi.yaml.
+package httpapi
+
+import (
+	"context"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"{{ go_module }}/internal/db/sqlc"
+)
+
+// Deps are the server's collaborators.
+type Deps struct {
+	Pool    *pgxpool.Pool
+	Version string
+}
+
+// Server implements StrictServerInterface.
+type Server struct {
+	queries sqlc.Querier
+	version string
+}
+
+var _ StrictServerInterface = (*Server)(nil)
+
+// NewRouter wires the generated routes, middleware and handlers.
+func NewRouter(deps Deps) http.Handler {
+	r := chi.NewRouter()
+	// Client IPs come from the reverse proxy; add a trusted-proxy middleware when one is needed.
+	r.Use(middleware.RequestID, middleware.Recoverer)
+	r.Use(middleware.Timeout(30 * time.Second))
+
+	srv := &Server{queries: sqlc.New(deps.Pool), version: deps.Version}
+	return HandlerFromMux(NewStrictHandler(srv, nil), r)
+}
+
+// GetHealth reports liveness and whether the database answers.
+func (s *Server) GetHealth(ctx context.Context, _ GetHealthRequestObject) (GetHealthResponseObject, error) {
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+
+	if _, err := s.queries.DatabaseNow(ctx); err != nil {
+		slog.WarnContext(ctx, "health: database unreachable", "err", err)
+		return GetHealth503ApplicationProblemPlusJSONResponse{
+			Title:  "database unreachable",
+			Status: http.StatusServiceUnavailable,
+		}, nil
+	}
+	return GetHealth200JSONResponse{Status: HealthStatusOk, Database: HealthDatabaseOk, Version: s.version}, nil
+}

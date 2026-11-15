@@ -1,0 +1,14 @@
+locals {
+  name = "{{ project_slug }}-dev"
+  tags = ["{{ project_slug }}", "env-dev"]
+}
+
+module "host" {
+  source = "../../modules/host"
+
+  name           = local.name
+  region         = var.region
+  size           = var.size
+  ssh_public_key = var.ssh_public_key
+  tags           = local.tags
+}

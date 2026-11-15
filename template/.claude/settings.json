@@ -1,0 +1,159 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(just *)",
+      "Bash(devbox run *)",
+      "Bash(pnpm install *)",
+      "Bash(pnpm turbo *)",
+      "Bash(pnpm exec *)",
+      "Bash(pnpm expo install *)",
+      "Bash(go test *)",
+      "Bash(go vet *)",
+      "Bash(go build *)",
+      "Bash(go generate *)",
+      "Bash(go tool *)",
+      "Bash(cargo fmt *)",
+      "Bash(cargo clippy *)",
+      "Bash(cargo test *)",
+      "Bash(cargo build *)",
+      "Bash(terraform fmt *)",
+      "Bash(terraform validate *)",
+      "Bash(terraform plan *)",
+      "Bash(gh pr view *)",
+      "Bash(gh pr list *)",
+      "Bash(gh pr checks *)",
+      "Bash(gh run view *)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Read(**/.env.local)",
+      "Read(**/.env.*.local)",
+      "Read(**/*.pem)",
+      "Read(**/*.p8)",
+      "Read(**/*.p12)",
+      "Read(**/*.key)",
+      "Read(**/*.jks)",
+      "Read(**/*.mobileprovision)",
+      "Read(**/*.tfstate)",
+      "Read(**/*.tfstate.*)",
+      "Read(~/.ssh/**)",
+      "Read(~/.aws/**)",
+      "Read(~/.config/doctl/**)",
+      "Bash(git push --force *)",
+      "Bash(git push -f *)",
+      "Bash(git push --force-with-lease *)",
+      "Bash(git push origin main *)",
+      "Bash(git push origin HEAD:main *)",
+      "Bash(git reset --hard *)",
+      "Bash(git clean *)",
+      "Bash(git stash drop *)",
+      "Bash(git stash clear *)",
+      "Bash(git branch -D *)",
+      "Bash(terraform apply *)",
+      "Bash(terraform destroy *)",
+      "Bash(terraform state *)",
+      "Bash(terraform import *)",
+      "Bash(terraform force-unlock *)",
+      "Bash(doctl * delete *)",
+      "Bash(gh repo delete *)",
+      "Bash(gh pr merge --admin *)",
+      "Bash(gh secret *)",
+      "Bash(gh api * -X DELETE *)",
+      "Bash(eas submit *)",
+      "Bash(eas update *)",
+      "Bash(npx eas-cli@latest submit *)",
+      "Bash(npx eas-cli@latest update *)",
+      "Bash(dropdb *)",
+      "Bash(rm -rf .git *)"
+    ]
+  },
+  "sandbox": {
+    "enabled": false,
+    "filesystem": {
+      "denyRead": ["~/.ssh", "~/.aws", "~/.config/doctl", "./.env", "./.env.local"],
+      "allowWrite": [
+        "~/Library/pnpm",
+        "~/.local/share/pnpm",
+        "~/Library/Caches",
+        "~/.cache",
+        "~/go/pkg/mod",
+        "~/.cargo/registry",
+        "~/.cargo/git"
+      ]
+    },
+    "network": {
+      "allowLocalBinding": true,
+      "allowedDomains": [
+        "registry.npmjs.org",
+        "proxy.golang.org",
+        "sum.golang.org",
+        "storage.googleapis.com",
+        "index.crates.io",
+        "static.crates.io",
+        "crates.io",
+        "github.com",
+        "api.github.com",
+        "objects.githubusercontent.com",
+        "codeload.github.com",
+        "docs.expo.dev",
+        "cache.nixos.org",
+        "search.devbox.sh"
+      ]
+    }
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/post-edit.sh",
+            "timeout": 120
+          }
+        ]
+      }
+    ],
+    "TaskCompleted": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/task-completed.sh",
+            "timeout": 900
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/stop.sh",
+            "timeout": 1800
+          }
+        ]
+      }
+    ]
+  },
+  "extraKnownMarketplaces": {
+    "pscaffold": { "source": { "source": "github", "repo": "askhari/pscaffold" } }
+  },
+  "enabledPlugins": {
+    "pscaffold@pscaffold": true,
+    "expo@claude-plugins-official": true
+  }
+}

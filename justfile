@@ -19,6 +19,6 @@ test backend:
 
 # Lint the repo's own shell scripts, the template's Claude config and the workflows.
 lint:
-    shellcheck template/.claude/hooks/*.sh template/scripts/*.sh scripts/*.sh
+    shellcheck template/.claude/hooks/*.sh template/scripts/*.sh template/scripts/git-hooks/* scripts/*.sh
     jq empty template/.claude/settings.json template/.claude/pscaffold.json
     actionlint .github/workflows/*.yml template/.github/workflows/template-update.yml

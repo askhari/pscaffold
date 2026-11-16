@@ -34,6 +34,18 @@ just verify       # everything CI runs
 
 Run `just` to list every recipe.
 
+## Agent commits
+
+Agents commit as `{{ agent_name }} <{{ agent_email }}>`, you commit as yourself. In a task
+worktree, `just agent-identity <model> <task>` sets that identity and a `commit-msg` hook that
+adds `Agent-Model:` and `Agent-Task:` trailers, whichever model drives the agent. Merge PRs
+with a merge commit (squash and rebase are disabled by `scripts/github-bootstrap.sh`), so
+`git blame` keeps agent and human lines apart. To see who wrote what:
+
+```bash
+git log --author='{{ agent_name }}' --format='%h %s %(trailers:key=Agent-Model,valueonly,separator=)'
+```
+
 Generated from [pscaffold](https://github.com/askhari/pscaffold). The `template-update`
 workflow opens a pull request every week when a new template release is out; to update by
 hand, run `devbox run -- copier update --trust`.

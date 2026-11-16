@@ -25,6 +25,10 @@ test_db_name := "app_test" + db_suffix
 db_url := "postgres://app@localhost:" + pg_port + "/" + db_name + "?sslmode=disable"
 test_db_url := "postgres://app@localhost:" + pg_port + "/" + test_db_name + "?sslmode=disable"
 
+# Identity for commits made by agents, so git blame tells agent lines from human ones.
+agent_name := "{{ agent_name }}"
+agent_email := "{{ agent_email }}"
+
 # List recipes.
 default:
     @just --list --unsorted
@@ -59,6 +63,25 @@ setup: doctor
     pnpm install
     just generate
     just db-up
+
+# Commit as the agent in this task worktree: sets the worktree's git author to the agent
+# identity and adds `Agent-Model:` / `Agent-Task:` trailers to every commit made here.
+# Any agent runs it once after creating its branch, whatever model drives it.
+agent-identity model task:
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ "$root" == "$main_root" ]]; then
+      echo "agent-identity: run it inside a task worktree; the main checkout keeps your own identity" >&2
+      exit 1
+    fi
+    [[ "$task" =~ ^[0-9]{4}-[0-9]{2}$ ]] || { echo "agent-identity: task must look like NNNN-MM" >&2; exit 1; }
+    git config extensions.worktreeConfig true
+    git config --worktree user.name "$agent_name"
+    git config --worktree user.email "$agent_email"
+    git config --worktree pscaffold.agentModel "$model"
+    git config --worktree pscaffold.agentTask "$task"
+    git config --worktree core.hooksPath scripts/git-hooks
+    echo "Committing as $agent_name <$agent_email> (Agent-Model: $model, Agent-Task: $task)"
 
 # ─── Code generation ────────────────────────────────────────────────────────
 
@@ -187,7 +210,7 @@ check-file path:
         terraform fmt "$f" ;;
       .github/workflows/*.yml|.github/workflows/*.yaml)
         actionlint "$f" ;;
-      *.sh)
+      *.sh|scripts/git-hooks/*)
         shellcheck "$f" ;;
       */Dockerfile|Dockerfile)
         hadolint "$f" ;;
@@ -236,7 +259,7 @@ lint:
     cd apps/api && cargo clippy --all-targets --locked -- -D warnings
 {%- endif %}
     actionlint
-    shellcheck .claude/hooks/*.sh scripts/*.sh
+    shellcheck .claude/hooks/*.sh scripts/*.sh scripts/git-hooks/*
 
 # Unit and integration tests (TypeScript + API).
 test:

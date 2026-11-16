@@ -53,6 +53,19 @@ bundle_id:
   help: iOS bundle identifier / Android package name
   default: "com.{{ github_owner | lower | replace('-', '') }}.{{ project_slug | replace('-', '') }}"
 
+agent_name:
+  type: str
+  help: Git author name for commits made by agents (kept apart from human commits in git blame)
+  default: "{{ github_owner }}-agent"
+  validator: "{% if not agent_name %}Required{% endif %}"
+
+agent_email:
+  type: str
+  help: Git author email for commits made by agents
+  default: "{{ github_owner }}-agent@users.noreply.github.com"
+  validator: >-
+    {% if not (agent_email | regex_search('^[^@\\s]+@[^@\\s]+$')) %}Use an email address{% endif %}
+
 backend:
   type: str
   help: API implementation language

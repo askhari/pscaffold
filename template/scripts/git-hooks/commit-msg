@@ -1,0 +1,15 @@
+#!/usr/bin/env bash
+# commit-msg hook for agent task worktrees. `just agent-identity <model> <task>` points the
+# worktree's core.hooksPath here; the main checkout and human commits never run it.
+# Adds the trailers that record which model and task produced the commit.
+set -euo pipefail
+
+model=$(git config --get pscaffold.agentModel || true)
+task=$(git config --get pscaffold.agentTask || true)
+
+args=()
+[[ -n "$model" ]] && args+=(--trailer "Agent-Model: $model")
+[[ -n "$task" ]] && args+=(--trailer "Agent-Task: $task")
+[[ ${#args[@]} -gt 0 ]] || exit 0
+
+git interpret-trailers --in-place --if-exists replace "${args[@]}" "$1"

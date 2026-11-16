@@ -7,6 +7,19 @@ version it implements (see `CONTRACT.md`) and the `pscaffold` plugin releases th
 
 ## [Unreleased]
 
+## [0.1.1] - 2026-11-16
+
+Template contract **1** · works with the pscaffold plugin **0.2.x**.
+
+### Added
+- Agent commit identity: copier questions `agent_name` / `agent_email`, the recipe
+  `just agent-identity <model> <task>` and a `commit-msg` hook that add `Agent-Model:` and
+  `Agent-Task:` trailers in task worktrees. The `implementer` agent runs it before its first
+  commit. Contract clause 6.
+- `scripts/github-bootstrap.sh` allows merge commits only (no squash or rebase), so
+  `git blame` keeps agent and human authorship apart.
+- Deny rules for `git commit --no-verify` and `git config --global`.
+
 ## [0.1.0] - 2026-11-15
 
 Template contract **1** · works with the `pscaffold` plugin **0.2.x** from

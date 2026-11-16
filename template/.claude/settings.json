@@ -21,6 +21,7 @@
       "Bash(terraform validate *)",
       "Bash(terraform plan *)",
       "Bash(git switch -c task/*)",
+      "Bash(just agent-identity *)",
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(git push -u origin HEAD)",
@@ -35,6 +36,8 @@
       "Bash(gh run view *)"
     ],
     "deny": [
+      "Bash(git commit *--no-verify*)",
+      "Bash(git config --global *)",
       "Read(**/.env)",
       "Read(**/.env.local)",
       "Read(**/.env.*.local)",

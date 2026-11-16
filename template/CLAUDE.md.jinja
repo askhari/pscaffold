@@ -12,5 +12,8 @@ tasks: `docs/specs/`.
   when a task is completed and `just verify` before the session ends.
 - Every task ends in a pull request titled `[NNNN-MM] <title>` with a `risk:*` label; never push
   to `main`.
+- Agents commit as `{{ agent_name }}` (`just agent-identity <model> <task>` in their worktree,
+  which adds `Agent-Model` / `Agent-Task` trailers); humans commit as themselves. PRs merge
+  with a merge commit, never squash or rebase, so `git blame` keeps the two apart.
 - Feature work runs through the pscaffold skills: `spec` → `plan` → `orchestrate`. Tasks are
   implemented by the `implementer` agent (`.claude/agents/`), one worktree and one PR each.

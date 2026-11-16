@@ -11,7 +11,10 @@ gh label create risk:normal --color fbca04 --description "Needs one human review
 gh label create risk:high --color d93f0b --description "Needs explicit owner approval" --force
 
 gh api -X PUT "repos/$repo/environments/dev" >/dev/null
-gh repo edit "$repo" --enable-auto-merge --delete-branch-on-merge
+# Merge commits only: squash and rebase would rewrite agent commits under the merger's name
+# and lose per-line authorship (agent vs human) in git blame.
+gh repo edit "$repo" --enable-auto-merge --delete-branch-on-merge \
+  --enable-merge-commit --enable-squash-merge=false --enable-rebase-merge=false
 
 gh api -X PUT "repos/$repo/branches/main/protection" --input - <<'JSON'
 {

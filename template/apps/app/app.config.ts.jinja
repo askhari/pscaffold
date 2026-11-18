@@ -1,11 +1,11 @@
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
-{%- if mobile_builds == 'eas' %}
+{% if mobile_builds == 'eas' -%}
 // Dynamic config: values that differ per environment come from EXPO_PUBLIC_* / EAS env vars.
-{%- else %}
+{% else -%}
 // Dynamic config: values that differ per environment come from EXPO_PUBLIC_* env vars, set
 // by the `just app-*` recipes. Builds are local; EAS is not used.
-{%- endif %}
+{% endif -%}
 export default ({ config }: ConfigContext): ExpoConfig => ({
   ...config,
   name: '{{ project_name }}',

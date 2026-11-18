@@ -53,7 +53,12 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        backend: [go, rust]
+        # Each backend also covers one way of building the apps (`mobile_builds`).
+        include:
+          - backend: go
+            mobile_builds: eas
+          - backend: rust
+            mobile_builds: local
     steps:
       - uses: actions/checkout@v7
         with:
@@ -76,7 +81,7 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.3
       - name: Render
         run: |
-          scripts/render.sh ${{ matrix.backend }} .render/product -d run_setup=false
+          scripts/render.sh ${{ matrix.backend }} .render/product -d run_setup=false -d mobile_builds=${{ matrix.mobile_builds }}
           cp .render/product/devbox.lock "$RUNNER_TEMP/devbox.lock"
       - uses: jetify-com/devbox-install-action@v0.16.0
         with:

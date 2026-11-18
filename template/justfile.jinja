@@ -25,6 +25,19 @@ db_name := "app" + db_suffix
 test_db_name := "app_test" + db_suffix
 db_url := "postgres://app@localhost:" + pg_port + "/" + db_name + "?sslmode=disable"
 test_db_url := "postgres://app@localhost:" + pg_port + "/" + test_db_name + "?sslmode=disable"
+{%- if mobile_builds == 'local' %}
+
+# Devbox's Nix environment exports its own Apple SDK and toolchain (DEVELOPER_DIR, SDKROOT,
+# CC, LD, MACOSX_DEPLOYMENT_TARGET, NIX_*), which xcodebuild picks up as build settings and
+# which break native iOS builds. Run those with a clean environment: the real Xcode tools
+# first on PATH, and a UTF-8 locale for CocoaPods.
+xcode_env := "env -i HOME=\"$HOME\" USER=\"$USER\" TMPDIR=\"${TMPDIR:-/tmp}\" PATH=\"/usr/bin:/bin:/usr/sbin:/sbin:$PATH\" LANG=en_US.UTF-8"
+
+# API the locally built apps talk to; it is baked into release builds, and a phone cannot
+# reach localhost. Set APP_API_URL in `.env` to the dev API's public URL (`just dev-app` keeps
+# using localhost).
+app_api_url := env_var_or_default("APP_API_URL", "")
+{%- endif %}
 
 # Identity for commits made by agents, so git blame tells agent lines from human ones.
 agent_name := "{{ agent_name }}"
@@ -56,6 +69,14 @@ doctor *flags:
     [[ "$have_rust" == "$want_rust"* ]] || warn "Rust $want_rust expected (found ${have_rust:-none}); install rustup so rust-toolchain.toml is honoured"
 {%- endif %}
     command -v pnpm >/dev/null || warn "pnpm missing; run inside 'devbox shell' or prefix with 'devbox run --'"
+{%- if mobile_builds == 'local' %}
+    # Native builds need system installs; they are notes, not failures, so API-only work
+    # and CI are not blocked.
+    if [[ "$(uname)" == Darwin && $quiet == false ]]; then
+      env -u DEVELOPER_DIR -u SDKROOT /usr/bin/xcodebuild -version >/dev/null 2>&1 || echo "doctor: note: Xcode not found; 'just app-ios' needs it" >&2
+      command -v pod >/dev/null || echo "doctor: note: CocoaPods not found; install it (brew install cocoapods), otherwise Expo installs it through Homebrew on the first iOS build" >&2
+    fi
+{%- endif %}
     if [[ $fail == 0 && $quiet == false ]]; then echo "doctor: ok"; fi
     exit $fail
 
@@ -162,6 +183,31 @@ dev-api: db-up
 # Run the Expo dev server (press i / a / w for iOS, Android, web).
 dev-app:
     cd apps/app && pnpm expo start
+{%- if mobile_builds == 'local' %}
+
+# ─── Local app builds (no EAS) ──────────────────────────────────────────────
+
+[private]
+app-api-url:
+    @[[ -n "${app_api_url}" ]] || { echo "Set APP_API_URL (in .env) to the public URL of the API the built app talks to" >&2; exit 1; }
+
+# Release build installed on a connected iPhone or a simulator: just app-ios "iPhone 17 Pro"
+app-ios device="": app-api-url
+    cd apps/app && {{ '{{ xcode_env }}' }} EXPO_PUBLIC_API_URL="${app_api_url}" pnpm expo run:ios --configuration Release --no-bundler --device ${device:+"$device"}
+
+# Generate the native iOS project and open it in Xcode (Product → Archive for TestFlight).
+app-ios-xcode: app-api-url
+    cd apps/app && {{ '{{ xcode_env }}' }} EXPO_PUBLIC_API_URL="${app_api_url}" pnpm expo prebuild --platform ios
+    open apps/app/ios/*.xcworkspace
+
+# Release build installed on a connected Android device or emulator (needs Android Studio).
+app-android: app-api-url
+    cd apps/app && EXPO_PUBLIC_API_URL="${app_api_url}" pnpm expo run:android --variant release
+
+# Static web export into apps/app/dist.
+app-web: app-api-url
+    cd apps/app && EXPO_PUBLIC_API_URL="${app_api_url}" pnpm expo export --platform web
+{%- endif %}
 
 # Create a timestamped migration: just new-migration add_users
 new-migration name:

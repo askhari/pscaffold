@@ -7,6 +7,23 @@ version it implements (see `CONTRACT.md`) and the `pscaffold` plugin releases th
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-18
+
+Template contract **2** · works with the pscaffold plugin **0.3.x** (`mobile_builds` needs 0.3.1).
+
+### Added
+- copier question `mobile_builds` (`eas` by default, or `local`). With `local` the product
+  has no `mobile.yml`, no `eas.json` and needs no Expo account; the recipes `just app-ios`,
+  `app-ios-xcode`, `app-android` and `app-web` build on the developer's machine against
+  `APP_API_URL`. The iOS recipes run with a clean environment, because Devbox's Nix Apple SDK
+  and toolchain variables break `xcodebuild`; `just doctor` notes a missing Xcode or CocoaPods.
+- copier is in the product's Devbox, so `devbox run -- copier update --trust` works as the
+  README says.
+
+### Fixed
+- `copier update` no longer fails in the `just setup` task: setup (and `git init`) run only
+  on `copier copy`. After an update, run `devbox run -- just setup` yourself.
+
 ## [0.2.0] - 2026-11-18
 
 Template contract **2** · works with the pscaffold plugin **0.3.x**.
@@ -79,7 +96,8 @@ Template contract **1** · works with the `pscaffold` plugin **0.2.x** from
   template.
 - `github_owner` has no default; every product states its owner.
 
-[Unreleased]: https://github.com/askhari/pscaffold/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/askhari/pscaffold/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/askhari/pscaffold/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/askhari/pscaffold/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/askhari/pscaffold/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/askhari/pscaffold/releases/tag/v0.1.0

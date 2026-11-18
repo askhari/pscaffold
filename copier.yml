@@ -20,10 +20,18 @@ _message_after_copy: |
     devbox run -- just setup
     devbox run -- just verify
 
+_message_after_update: |
+  Updated {{ project_name }}. Reinstall and regenerate, then check:
+    devbox run -- just setup
+    devbox run -- just verify
+
+# Setup runs only on `copier copy`: during an update copier also renders into temporary
+# directories, where the local Postgres cannot start.
 _tasks:
   - command: "[ -d .git ] || git init -q -b main"
+    when: "{{ _copier_operation == 'copy' }}"
   - command: devbox run -- just setup
-    when: "{{ run_setup }}"
+    when: "{{ run_setup and _copier_operation == 'copy' }}"
   # The documents written before the render (brief, ADRs, copier answers) never went through
   # the edit hook: format them once so the first `just verify` is green.
   - command: devbox run -- just format
@@ -90,6 +98,14 @@ platform_product:
   default: "{{ project_slug | replace('-', '') }}"
   validator: >-
     {% if not (platform_product | regex_search('^[a-z][a-z0-9_]*$')) %}Use lowercase letters, digits and underscores (it names a PostgreSQL database){% endif %}
+
+mobile_builds:
+  type: str
+  help: How the native apps are built and shipped
+  choices:
+    EAS (cloud builds, store submission, over-the-air updates): eas
+    Local (Xcode and Android Studio on your machine, no Expo account): local
+  default: eas
 
 dev_db_port:
   type: int

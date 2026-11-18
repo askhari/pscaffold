@@ -107,6 +107,7 @@ Some settings cannot live in a repo by design:
 devbox shell
 just test go      # render with the Go backend and run its `just verify`
 just test rust    # same for Rust
+just test go -d mobile_builds=local   # any copier answer can be overridden
 ```
 
 The two renders use different slugs (`sample-go`, `sample-rust`), hence different local

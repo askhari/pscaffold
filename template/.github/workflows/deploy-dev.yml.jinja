@@ -1,4 +1,4 @@
-# Builds the API image and deploys it to the dev host with Docker Compose.
+# Builds the API image and deploys it to the shared platform over SSH (see infra/README.md).
 name: deploy-dev
 
 on:
@@ -47,19 +47,25 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Encode the Compose file
+        id: compose
+        run: echo "b64=$(base64 -w0 infra/deploy/compose.yaml)" >> "$GITHUB_OUTPUT"
+
       - name: Deploy over SSH
         uses: appleboy/ssh-action@v1.2.5
         env:
           API_IMAGE: {% raw %}${{ env.IMAGE }}:${{ github.sha }}{% endraw %}
+          COMPOSE_B64: {% raw %}${{ steps.compose.outputs.b64 }}{% endraw %}
         with:
           host: {% raw %}${{ secrets.DEPLOY_HOST }}{% endraw %}
           username: deploy
           key: {% raw %}${{ secrets.DEPLOY_SSH_KEY }}{% endraw %}
-          envs: API_IMAGE
+          envs: API_IMAGE,COMPOSE_B64
           script: |
             set -euo pipefail
-            cd /opt/{{ project_slug }}
-            echo "API_IMAGE=$API_IMAGE" > .env.image
-            docker compose --env-file .env --env-file .env.image pull api
-            docker compose --env-file .env --env-file .env.image up -d --remove-orphans
+            cd /opt/platform/products/{{ platform_product }}-dev
+            echo "$COMPOSE_B64" | base64 -d > compose.yml
+            printf 'API_IMAGE=%s\nDEPLOY_ENV=dev\n' "$API_IMAGE" > .env
+            docker compose pull api
+            docker compose up -d --remove-orphans
             docker image prune -f

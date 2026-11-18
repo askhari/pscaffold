@@ -8,12 +8,12 @@
 | `apps/api` | HTTP API ({{ 'Go' if backend == 'go' else 'Rust' }}) |
 | `contract` | OpenAPI contract — source of truth for the API |
 | `packages/api-client` | Generated TypeScript client + contract tests |
-| `infra` | {{ 'Terraform (DigitalOcean) and' if infra_target == 'digitalocean' else '' }} Docker Compose deployment |
+| `infra` | Docker Compose deployment onto the shared platform |
 | `docs` | Brief, ADRs, specs and tasks |
 
 ## Requirements
 
-- [Devbox](https://www.jetify.com/devbox) for support tools (just, pnpm, Postgres, Terraform…).
+- [Devbox](https://www.jetify.com/devbox) for support tools (just, pnpm, Postgres…).
 - Node (version in `.node-version`, e.g. via `fnm`).
 {%- if backend == 'go' %}
 - Go (version in `apps/api/go.mod`).

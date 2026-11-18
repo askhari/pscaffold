@@ -15,7 +15,8 @@ root := justfile_directory()
 backend := "{{ backend }}"
 
 # Git worktrees (one per agent task) share the main checkout's Postgres cluster but get their
-# own databases, so parallel tasks never step on each other's data.
+# own databases, so parallel tasks never step on each other's data. Each product has its own
+# default port (derived from its slug when it was generated); DEV_DB_PORT overrides it.
 main_root := `d=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null) && dirname "$d" || pwd`
 db_suffix := if root == main_root { "" } else { "_" + trim_end_match(replace_regex(lowercase(file_name(root)), "[^a-z0-9]+", "_"), "_") }
 pg_port := env_var_or_default("DEV_DB_PORT", "{{ dev_db_port }}")
@@ -206,8 +207,6 @@ check-file path:
       apps/api/*.rs)
         (cd apps/api && rustfmt --edition 2024 "${f#apps/api/}") ;;
 {%- endif %}
-      *.tf|*.tfvars)
-        terraform fmt "$f" ;;
       .github/workflows/*.yml|.github/workflows/*.yaml)
         actionlint "$f" ;;
       *.sh|scripts/git-hooks/*)
@@ -231,20 +230,18 @@ test-affected:
     fi
     if has '^(apps/api|contract)/'; then just test-api; fi
     if has '^contract/'; then just test-contract; fi
-{%- if infra_target == 'digitalocean' %}
-    if has '^infra/terraform/'; then just check-infra; fi
-{%- endif %}
 
     # ── Critical suites: always run when their paths change (added by `architect` / `spec`).
     # Example:
     # if has '^apps/api/internal/auth/'; then (cd apps/api && TEST_DATABASE_URL="${test_db_url}" go test ./internal/auth/...); fi
 
-# Run every check: lint, typecheck, tests, contract and infrastructure (called before a session ends, and by CI).
+# Run every check: lint, typecheck, tests and contract (called before a session ends, and by CI).
 verify: lint test test-contract
-{%- if infra_target == 'digitalocean' %}
-    just check-infra
-{%- endif %}
     @echo "verify: ok"
+
+# Rewrite every file Prettier covers (docs, JSON, YAML, TypeScript) in place.
+format:
+    pnpm exec prettier --write --log-level warn .
 
 # Static checks for every part of the repo.
 lint:
@@ -291,12 +288,3 @@ test-contract: db-up
     for _ in $(seq 1 50); do curl -fs "http://localhost:$port/healthz" >/dev/null && break; sleep 0.2; done
     API_BASE_URL="http://localhost:$port" pnpm --filter "./packages/api-client" run test:contract \
       || { echo "--- API log ---"; cat "$log"; exit 1; }
-{%- if infra_target == 'digitalocean' %}
-
-# Terraform formatting, validation and lint (no cloud credentials needed).
-check-infra:
-    terraform -chdir=infra/terraform fmt -check -recursive
-    terraform -chdir=infra/terraform/envs/dev init -backend=false -input=false >/dev/null
-    terraform -chdir=infra/terraform/envs/dev validate
-    cd infra/terraform && tflint --recursive --config "$PWD/.tflint.hcl"
-{%- endif %}

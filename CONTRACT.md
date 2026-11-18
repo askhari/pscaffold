@@ -1,6 +1,6 @@
 # Template contract
 
-**Contract version: 1** (declared to products in `template/.claude/pscaffold.json`).
+**Contract version: 2** (declared to products in `template/.claude/pscaffold.json`).
 
 The `pscaffold` plugin ([askhari/claude-plugins](https://github.com/askhari/claude-plugins),
 `plugins/pscaffold`) contains no code: its skills tell Claude to run recipes, read files and
@@ -12,19 +12,20 @@ on. A generated product promises all of it.
 1. **copier answers.** `architect` writes `docs/copier-answers.yml` and `new-project` passes it
    to `copier copy --data-file`. The question names and choices in `copier.yml` are part of
    the contract: `project_name`, `project_slug`, `github_owner`, `bundle_id`, `agent_name`,
-   `agent_email`, `backend` (`go` | `rust`), `infra_target` (`digitalocean` | `vps`),
-   `do_region`. copier never overwrites `docs/brief.md`, `docs/adr/README.md` or
+   `agent_email`, `backend` (`go` | `rust`), `platform_product` (defaults to the slug without
+   dashes), `dev_db_port` (defaults to a port derived from the slug). copier never overwrites `docs/brief.md`, `docs/adr/README.md` or
    `.github/CODEOWNERS` (`_skip_if_exists`).
 2. **Document layout.** `docs/brief.md`, `docs/adr/NNNN-slug.md`,
    `docs/specs/NNNN-slug/spec.md`, `docs/specs/NNNN-slug/tasks.md`. The task table has the
    columns ID, Task, Type (AFK | HITL), Blocked by, Risk (low | normal | high), Model
    (haiku | sonnet | opus | —); `plan` writes it and `orchestrate` reads it.
 3. **`just` recipes.** `setup`, `verify`, `generate`, `check-file`, `test-api`,
-   `test-affected`, `db-up`, `db-prune`, `agent-identity <model> <task>`. Names and meaning are
+   `test-affected`, `format`, `db-up`, `db-prune`, `agent-identity <model> <task>`. Names and meaning are
    stable; their implementation is not part of the contract.
 4. **GitHub conventions.** Task branches `task/NNNN-MM-<slug>`; PR titles `[NNNN-MM] <title>`;
    exactly one `risk:low|normal|high` label per PR (created by `scripts/github-bootstrap.sh`,
-   enforced by the `pr-policy` workflow); the secret names listed by `new-project`.
+   enforced by the `pr-policy` workflow); the secret names listed by `new-project`
+   (`DEPLOY_HOST`, `DEPLOY_SSH_KEY`, `EXPO_TOKEN` in the `dev` environment).
 5. **The `implementer` agent** (`.claude/agents/implementer.md`): dispatched by name by
    `orchestrate`, runs in its own worktree, cannot finish until `just verify` passes, and ends
    with the fixed report (Task / PR / Verification / just verify / Done when / Notes).
@@ -34,7 +35,18 @@ on. A generated product promises all of it.
    merge commits only (`scripts/github-bootstrap.sh` disables squash and rebase).
 7. **Stack.** The template implements what the plugin's `PREFERENCES.md` assumes: Expo
    universal app, OpenAPI contract as the source of truth, Go or Rust API, offline-first sync
-   conventions, auth inside the API, Terraform for DigitalOcean.
+   conventions, auth inside the API, PostgreSQL 18.
+8. **Deployment.** The product creates no infrastructure. `deploy-dev` deploys the API
+   container `<platform_product>-<env>-api` into `/opt/platform/products/<platform_product>-<env>/`
+   on a shared platform that provides PostgreSQL (`DATABASE_URL` in `db.env`), TLS and the
+   external Docker network `platform`. `infra/README.md` in the product states the details.
+
+## History
+
+- **2**: `infra_target` and `do_region` removed together with the per-product Terraform and
+  the standalone Compose stack (own PostgreSQL and Caddy); `platform_product` and clause 8
+  added.
+- **1**: first version.
 
 ## Changing it
 

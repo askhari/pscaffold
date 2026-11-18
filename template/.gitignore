@@ -25,13 +25,6 @@ apps/app/android/
 *.mobileprovision
 *.pem
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.*
-*.tfplan
-crash.log
-
 # Local environment
 .env
 .env.*

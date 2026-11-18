@@ -1,5 +1,5 @@
 # copier configuration for pscaffold product repositories.
-_min_copier_version: "9.4"
+_min_copier_version: "9.5"
 _subdirectory: template
 _answers_file: .copier-answers.yml
 _templates_suffix: .jinja
@@ -24,6 +24,10 @@ _tasks:
   - command: "[ -d .git ] || git init -q -b main"
   - command: devbox run -- just setup
     when: "{{ run_setup }}"
+  # The documents written before the render (brief, ADRs, copier answers) never went through
+  # the edit hook: format them once so the first `just verify` is green.
+  - command: devbox run -- just format
+    when: "{{ run_setup and _copier_operation == 'copy' }}"
 
 project_name:
   type: str
@@ -32,7 +36,7 @@ project_name:
 
 project_slug:
   type: str
-  help: Kebab-case identifier (repo name, Docker image, Terraform resources)
+  help: Kebab-case identifier (repo name, Docker image)
   default: "{{ project_name | lower | replace(' ', '-') }}"
   validator: >-
     {% if not (project_slug | regex_search('^[a-z][a-z0-9-]*[a-z0-9]$')) %}Use lowercase letters, digits and dashes{% endif %}
@@ -80,24 +84,19 @@ go_module:
   default: "github.com/{{ github_owner }}/{{ project_slug }}/apps/api"
   when: "{{ backend == 'go' }}"
 
-infra_target:
+platform_product:
   type: str
-  help: Where the dev environment runs
-  choices:
-    DigitalOcean (Terraform-managed droplet): digitalocean
-    Own VPS (Docker Compose over SSH): vps
-  default: digitalocean
-
-do_region:
-  type: str
-  help: DigitalOcean region
-  default: fra1
-  when: "{{ infra_target == 'digitalocean' }}"
+  help: Product name on the shared platform (database <name>_<env>, directory and container <name>-<env>)
+  default: "{{ project_slug | replace('-', '') }}"
+  validator: >-
+    {% if not (platform_product | regex_search('^[a-z][a-z0-9_]*$')) %}Use lowercase letters, digits and underscores (it names a PostgreSQL database){% endif %}
 
 dev_db_port:
   type: int
-  help: Local Postgres port for this project (use a different one per product on the same machine)
-  default: 54320
+  help: Local Postgres port for this project (the default is derived from the slug, so each product gets its own)
+  default: "{{ 20000 + ((project_slug | hash('md5'))[:6] | int(base=16)) % 10000 }}"
+  validator: >-
+    {% if dev_db_port < 1024 or dev_db_port > 65535 %}Use a port between 1024 and 65535{% endif %}
 
 run_setup:
   type: bool

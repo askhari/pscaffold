@@ -1,39 +1,56 @@
 # Infrastructure
 
-Only a `dev` environment exists. Add `prod` by copying `terraform/envs/dev` to
-`terraform/envs/prod` (own state key, own GitHub environment and secrets) once real users or a
-TestFlight build depend on it.
+This repository creates no cloud resources. {{ project_name }} runs on a shared platform that
+is defined in its own repository: one host with Docker Compose, one PostgreSQL server for
+every product, Caddy for TLS and S3-compatible object storage. Changes to the machine itself
+are made there, never here.
 
-## Runtime (`deploy/`)
+Only a `dev` environment exists. `prod` is a second tenant on the same platform, added there
+(database, bucket, hostname) and here (a `deploy-prod` workflow with its own GitHub
+environment and `DEPLOY_ENV=prod`) once real users or a TestFlight build depend on it.
 
-Docker Compose on a single host: API, PostgreSQL 18 and Caddy. The `deploy-dev` workflow builds
-the API image, pushes it to GHCR and runs `docker compose up -d` over SSH as the `deploy` user in
-`/opt/{{ project_slug }}`. First-time host setup (once):
+## What the platform provides
 
-1. Copy `deploy/compose.yaml`, `deploy/Caddyfile` and `deploy/env.example` (as `.env`, with real
-   values) to `/opt/{{ project_slug }}/`.
-2. `docker login ghcr.io` on the host with a token that can read packages.
-3. Add `DEPLOY_HOST` and `DEPLOY_SSH_KEY` to the `dev` environment secrets in GitHub.
-{% if infra_target == 'digitalocean' %}
-## Terraform (`terraform/`)
+The product is known to the platform as `{{ platform_product }}` (`platform_product` in
+`.copier-answers.yml`). For each environment the platform owns:
 
-`modules/host` creates the droplet (Docker preinstalled via cloud-init), a reserved IP, an SSH
-key and a firewall. `envs/dev` instantiates it. State lives in a DigitalOcean Spaces bucket
-(S3-compatible backend, see `envs/dev/backend.hcl`); create that bucket once by hand.
+| What | Name |
+|---|---|
+| Directory on the host | `/opt/platform/products/{{ platform_product }}-<env>/` |
+| Database and role | `{{ platform_product }}_<env>`; `DATABASE_URL` in `db.env` in that directory |
+| Docker network | `platform` (external); PostgreSQL is reachable on it as `postgres:5432` |
+| Hostname and TLS | Caddy site `{{ platform_product }}-<env>`, proxied to `{{ platform_product }}-<env>-api:8080` |
+| Object storage | one bucket per environment, with a key scoped to it |
+| Backups | nightly database dumps |
 
-```bash
-export DIGITALOCEAN_TOKEN=...            # or `doctl auth init`
-export AWS_ACCESS_KEY_ID=...             # Spaces key, used by the S3 backend
-export AWS_SECRET_ACCESS_KEY=...
-terraform -chdir=infra/terraform/envs/dev init -backend-config=backend.hcl
-terraform -chdir=infra/terraform/envs/dev plan
-```
+The platform repository's README says how a product is added and how to read its values
+(hostname, bucket, credentials).
 
-`terraform apply` runs only from CI (`.github/workflows/terraform.yml`) after merge; agents are
-denied `apply`/`destroy` locally.
-{% else %}
-## Host
+## What this repository does (`deploy/`)
 
-The VPS is provisioned outside this repo. It needs Docker with the compose plugin and a `deploy`
-user allowed to run Docker.
-{% endif %}
+`deploy/compose.yaml` runs only the API container, named `{{ platform_product }}-<env>-api`,
+on the `platform` network, with `DATABASE_URL` loaded from `db.env`. It publishes no ports and
+starts no database or proxy of its own. The `deploy-dev` workflow builds the image, pushes it
+to GHCR, then over SSH as the `deploy` user writes `compose.yml` and `.env` into
+`/opt/platform/products/{{ platform_product }}-dev/` and runs `docker compose pull` and
+`docker compose up -d`.
+
+First-time setup (once per product):
+
+1. On the platform: add the `{{ platform_product }}` / `dev` tenant, provision its database
+   (this writes `db.env`) and add its Caddy site.
+2. On the host, as `deploy`: `docker login ghcr.io` with a token that can read packages.
+3. In GitHub, `dev` environment secrets: `DEPLOY_HOST` (the platform host) and
+   `DEPLOY_SSH_KEY` (the platform's CI key, which can only log in as `deploy`).
+
+## PostgreSQL version
+
+**PostgreSQL 18** everywhere. The platform's server, the local Devbox package
+(`postgresql_18` in `devbox.json`, also used by CI) and any SQL feature the API relies on
+(for example native `uuidv7()`) must be on the same major. Move to a new major only after the
+platform has been upgraded, by changing the Devbox package here.
+
+## Local development
+
+Nothing here is needed locally: `just db-up` starts the Devbox PostgreSQL on this product's
+own port (`DEV_DB_PORT`, default {{ dev_db_port }}) and the API listens on plain HTTP.

@@ -7,7 +7,7 @@ It contains:
 
 | Path | What it is |
 |---|---|
-| `template/`, `copier.yml` | [copier](https://copier.readthedocs.io) template for a product monorepo: Expo app, Go or Rust API, OpenAPI contract, Terraform, GitHub Actions, Claude Code harness. |
+| `template/`, `copier.yml` | [copier](https://copier.readthedocs.io) template for a product monorepo: Expo app, Go or Rust API, OpenAPI contract, deployment onto a shared platform, GitHub Actions, Claude Code harness. |
 | `CONTRACT.md` | What the `pscaffold` plugin relies on in every generated product, and how it is versioned. |
 | `docs/adr/` | Why the template looks the way it does. |
 
@@ -74,6 +74,15 @@ copier applies the template changes between the release the product was generate
 conflicts show up like git merge conflicts. The template keeps no record of the products
 generated from it: each product pulls updates itself.
 
+## Where products run
+
+A generated product creates no cloud resources. It deploys one API container onto a shared
+platform (one host with Docker Compose, one PostgreSQL server, Caddy for TLS) that is defined
+in a repository of its own; see [ADR 8](docs/adr/0008-products-deploy-onto-a-shared-platform.md)
+and the generated `infra/README.md` for what the product expects from it. Locally each
+product runs its own Devbox PostgreSQL on a port derived from its slug, so several products
+can run side by side.
+
 ## Releases
 
 Add the release to `CHANGELOG.md`, then tag it (`git tag v0.2.0 && git push origin v0.2.0`);
@@ -99,3 +108,7 @@ devbox shell
 just test go      # render with the Go backend and run its `just verify`
 just test rust    # same for Rust
 ```
+
+The two renders use different slugs (`sample-go`, `sample-rust`), hence different local
+Postgres ports, and can stay up at the same time. Rendering over an existing directory stops
+the Postgres it left running first.
